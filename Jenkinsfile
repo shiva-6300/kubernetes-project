@@ -2,7 +2,7 @@ pipeline {
   agent any
 
   environment {
-    SONARQUBE_SERVER = 'SonarQube'
+    SONARQUBE_SERVER = 'SonarQube'   // match your config name
     SCANNER_HOME = tool 'SonarScanner'
   }
 
@@ -18,11 +18,11 @@ pipeline {
     stage('SonarQube Analysis') {
       steps {
         withSonarQubeEnv("${SONARQUBE_SERVER}") {
-          sh '''
-            sonar-scanner \
+          sh """
+            ${SCANNER_HOME}/bin/sonar-scanner \
             -Dsonar.projectKey=kubernetes-project \
             -Dsonar.sources=.
-          '''
+          """
         }
       }
     }
