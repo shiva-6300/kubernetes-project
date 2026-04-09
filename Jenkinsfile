@@ -3,6 +3,7 @@ pipeline {
 
   environment {
     SONARQUBE_SERVER = 'SonarQube'
+    SCANNER_HOME = tool 'SonarScanner'
   }
 
   stages {
