@@ -42,8 +42,19 @@ pipeline {
                 echo 'Building Python package'
                 sh '''
                     python3 --version
-                    python3 -m pip install --upgrade pip setuptools wheel
-                    python3 setup.py sdist bdist_wheel
+
+                    # Create virtual environment
+                    python3 -m venv venv
+                    . venv/bin/activate
+
+                    # Upgrade build tools
+                    pip install --upgrade pip setuptools wheel
+
+                    # Build package
+                    python setup.py sdist bdist_wheel
+
+                    # Verify build output
+                    ls -l dist
                 '''
             }
         }
