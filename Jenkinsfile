@@ -15,7 +15,7 @@ pipeline {
             }
         }
 
-        stage('Filesystem Scan (Trivy)') {
+        stage('Trivy Scan') {
             steps {
                 echo 'Running filesystem security scan'
                 sh '''
