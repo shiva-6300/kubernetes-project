@@ -31,7 +31,8 @@ pipeline {
                     sh """
                         ${SCANNER_HOME}/bin/sonar-scanner \
                         -Dsonar.projectKey=kubernetes-project \
-                        -Dsonar.sources=.
+                        -Dsonar.sources=. \
+                        -Dsonar.exclusions=**/venv/**,**/__pycache__/**,**/*.pyc
                     """
                 }
             }
