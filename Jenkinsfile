@@ -2,7 +2,7 @@ pipeline {
   agent any
 
   environment {
-    SONARQUBE_SERVER = 'SonarQube'   // match your config name
+    SONARQUBE_SERVER = 'SonarQube'
     SCANNER_HOME = tool 'SonarScanner'
   }
 
@@ -15,8 +15,27 @@ pipeline {
       }
     }
 
+    stage('Filesystem Scan (Trivy)') {
+      steps {
+        echo 'Running filesystem security scan'
+        sh '''
+          trivy fs --severity HIGH,CRITICAL . || true
+        '''
+      }
+    }
+
+    stage('Clean Workspace') {
+      steps {
+        echo 'Removing virtual environment folder'
+        sh '''
+          rm -rf venv
+        '''
+      }
+    }
+
     stage('SonarQube Analysis') {
       steps {
+        echo 'Running SonarQube analysis'
         withSonarQubeEnv("${SONARQUBE_SERVER}") {
           sh """
             ${SCANNER_HOME}/bin/sonar-scanner \
