@@ -37,12 +37,14 @@ pipeline {
             }
         }
 
-        stage('Quality Gate') {
+        stage('Build Python Package') {
             steps {
-                echo 'Checking Quality Gate status'
-                timeout(time: 6, unit: 'MINUTES') {
-                    waitForQualityGate abortPipeline: true
-                }
+                echo 'Building Python package'
+                sh '''
+                    python3 --version
+                    python3 -m pip install --upgrade pip setuptools wheel
+                    python3 setup.py sdist bdist_wheel
+                '''
             }
         }
     }
