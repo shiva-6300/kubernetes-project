@@ -37,23 +37,31 @@ pipeline {
             }
         }
 
-        stage('Build Python Package') {
+        stage('Build Python Backend') {
             steps {
-                echo 'Building Python package'
+                echo 'Building Python backend package'
                 sh '''
-                    python3 --version
+                    echo "Current directory:"
+                    pwd
+                    ls -l
+
+                    cd backend
+
+                    echo "Inside backend folder:"
+                    pwd
+                    ls -l
 
                     # Create virtual environment
                     python3 -m venv venv
                     . venv/bin/activate
 
-                    # Upgrade build tools
+                    # Install build tools
                     pip install --upgrade pip setuptools wheel
 
                     # Build package
                     python setup.py sdist bdist_wheel
 
-                    # Verify build output
+                    # Show artifacts
                     ls -l dist
                 '''
             }
@@ -62,10 +70,10 @@ pipeline {
 
     post {
         success {
-            echo 'Pipeline completed successfully.'
+            echo 'Pipeline completed successfully ✅'
         }
         failure {
-            echo 'Pipeline failed.'
+            echo 'Pipeline failed ❌'
         }
     }
 }
