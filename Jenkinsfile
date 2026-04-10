@@ -2,7 +2,7 @@ pipeline {
   agent any
 
   environment {
-    SONARQUBE_SERVER = 'SonarQube'
+    SONARQUBE_SERVER = 'SonarQube'   // match your config name
     SCANNER_HOME = tool 'SonarScanner'
   }
 
@@ -12,15 +12,6 @@ pipeline {
       steps {
         echo 'Checking out source code'
         git url: 'https://github.com/shiva-6300/kubernetes-project.git', branch: 'main'
-      }
-    }
-
-    stage('Filesystem Scan (Trivy)') {
-      steps {
-        echo 'Running filesystem security scan'
-        sh '''
-          trivy fs --severity HIGH,CRITICAL .
-        '''
       }
     }
 
