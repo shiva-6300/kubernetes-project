@@ -4,6 +4,7 @@ pipeline {
     environment {
         SONARQUBE_SERVER = 'SonarQube'
         SCANNER_HOME = tool 'SonarScanner'
+        IMAGE_NAME = "kubernetes-project:latest"
     }
 
     stages {
@@ -42,28 +43,59 @@ pipeline {
             steps {
                 echo 'Building Python backend package'
                 sh '''
-                    echo "Current directory:"
-                    pwd
-                    ls -l
-
                     cd backend
 
-                    echo "Inside backend folder:"
-                    pwd
-                    ls -l
-
-                    # Create virtual environment
                     python3 -m venv venv
                     . venv/bin/activate
 
-                    # Install build tools
                     pip install --upgrade pip setuptools wheel
 
-                    # Build package
                     python setup.py sdist bdist_wheel
 
-                    # Show artifacts
                     ls -l dist
+                '''
+            }
+        }
+
+        stage('Upload to Nexus') {
+            steps {
+                echo 'Uploading Python package to Nexus'
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexus-creds',
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
+
+                    sh '''
+                        cd backend
+                        . venv/bin/activate
+
+                        pip install twine
+
+                        cat > ~/.pypirc <<EOF
+[distutils]
+index-servers =
+    nexus
+
+[nexus]
+repository: http://13.125.75.162:8081/repository/pypi-hosted/
+username: $NEXUS_USER
+password: $NEXUS_PASS
+EOF
+
+                        twine upload -r nexus dist/*
+                    '''
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                echo 'Building Docker image'
+                sh '''
+                    cd backend
+                    docker build -t $IMAGE_NAME .
                 '''
             }
         }
