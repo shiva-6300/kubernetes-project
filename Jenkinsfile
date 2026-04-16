@@ -4,7 +4,7 @@ pipeline {
     environment {
         SONARQUBE_SERVER = 'SonarQube'
         SCANNER_HOME = tool 'SonarScanner'
-        IMAGE_NAME = "kubernetes-project:latest"
+        IMAGE_NAME = "shivavaddi/kubernetes-project:${BUILD_NUMBER}"
     }
 
     stages {
@@ -79,7 +79,7 @@ index-servers =
     nexus
 
 [nexus]
-repository: http://43.203.120.145:8081/repository/pypi-releases/
+repository: http://43.202.62.54:8081/repository/pypi-releases/
 username: $NEXUS_USER
 password: $NEXUS_PASS
 EOF
@@ -97,6 +97,30 @@ EOF
                     cd backend
                     docker build -t $IMAGE_NAME .
                 '''
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                echo 'Pushing Docker image to Docker Hub'
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
+                        docker push $IMAGE_NAME
+
+                        docker tag $IMAGE_NAME shivavaddi/kubernetes-project:latest
+                        docker push shivavaddi/kubernetes-project:latest
+
+                        docker logout
+                    '''
+                }
             }
         }
     }
