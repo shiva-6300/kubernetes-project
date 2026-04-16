@@ -1,12 +1,6 @@
 pipeline {
     agent any
 
-    environment {
-        SONARQUBE_SERVER = 'SonarQube'
-        SCANNER_HOME = tool 'SonarScanner'
-        IMAGE_NAME = "shivavaddi/kubernetes-project:${BUILD_NUMBER}"
-    }
-
     stages {
 
         stage('Git Clone') {
