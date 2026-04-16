@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    environment {
+        IMAGE_NAME = "shivavaddi/kubernetes-project:latest"
+    }
+
     stages {
 
         stage('Git Clone') {
@@ -10,12 +14,101 @@ pipeline {
             }
         }
 
-        stage('Trivy Scan') {
+        stage('Trivy FS Scan') {
             steps {
                 echo 'Running filesystem security scan'
                 sh '''
                     trivy fs --severity HIGH,CRITICAL .
                 '''
+            }
+        }
+
+        stage('Build Python Backend') {
+            steps {
+                echo 'Building Python backend package'
+                sh '''
+                    cd backend
+
+                    python3 -m venv venv
+                    . venv/bin/activate
+
+                    pip install --upgrade pip setuptools wheel
+
+                    python setup.py sdist bdist_wheel
+
+                    ls -l dist
+                '''
+            }
+        }
+
+        stage('Upload to Nexus') {
+            steps {
+                echo 'Uploading Python package to Nexus'
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexus-creds',
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
+
+                    sh '''
+                        cd backend
+                        . venv/bin/activate
+
+                        pip install twine
+
+                        cat > ~/.pypirc <<EOF
+[distutils]
+index-servers =
+    nexus
+
+[nexus]
+repository: http://54.180.227.146:8081/repository/pypi-releases/
+username: $NEXUS_USER
+password: $NEXUS_PASS
+EOF
+
+                        twine upload -r nexus dist/*
+                    '''
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                echo 'Building Docker image'
+                sh '''
+                    cd backend
+                    docker build -t $IMAGE_NAME .
+                '''
+            }
+        }
+
+        stage('Trivy Image Scan') {
+            steps {
+                echo 'Scanning Docker image'
+                sh '''
+                    trivy image --severity HIGH,CRITICAL $IMAGE_NAME
+                '''
+            }
+        }
+
+        stage('Push to DockerHub') {
+            steps {
+                echo 'Pushing image to DockerHub'
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push $IMAGE_NAME
+                        docker logout
+                    '''
+                }
             }
         }
     }
