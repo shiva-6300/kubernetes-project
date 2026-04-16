@@ -2,6 +2,8 @@ pipeline {
     agent any
 
     environment {
+        SONARQUBE_SERVER = 'SonarQube'
+        SCANNER_HOME = tool 'SonarScanner'
         IMAGE_NAME = "shivavaddi/kubernetes-project:latest"
     }
 
@@ -20,6 +22,20 @@ pipeline {
                 sh '''
                     trivy fs --severity HIGH,CRITICAL .
                 '''
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                echo 'Running SonarQube analysis'
+                withSonarQubeEnv("${SONARQUBE_SERVER}") {
+                    sh """
+                        ${SCANNER_HOME}/bin/sonar-scanner \
+                        -Dsonar.projectKey=kubernetes-project \
+                        -Dsonar.sources=. \
+                        -Dsonar.exclusions=**/venv/**,**/__pycache__/**,**/*.pyc
+                    """
+                }
             }
         }
 
