@@ -25,106 +25,95 @@ pipeline {
             }
         }
 
-        /*
-        stage('SonarQube Analysis') {
-            steps {
-                echo 'Running SonarQube analysis'
-                withSonarQubeEnv("${SONARQUBE_SERVER}") {
-                    sh """
-                        ${SCANNER_HOME}/bin/sonar-scanner \
-                        -Dsonar.projectKey=kubernetes-project \
-                        -Dsonar.sources=. \
-                        -Dsonar.exclusions=**/venv/**,**/__pycache__/**,**/*.pyc
-                    """
-                }
-            }
-        }
+        // stage('SonarQube Analysis') {
+        //     steps {
+        //         echo 'Running SonarQube analysis'
+        //         withSonarQubeEnv("${SONARQUBE_SERVER}") {
+        //             sh """
+        //                 ${SCANNER_HOME}/bin/sonar-scanner \
+        //                 -Dsonar.projectKey=kubernetes-project \
+        //                 -Dsonar.sources=. \
+        //                 -Dsonar.exclusions=**/venv/**,**/__pycache__/**,**/*.pyc
+        //             """
+        //         }
+        //     }
+        // }
 
-        stage('Build Python Backend') {
-            steps {
-                echo 'Building Python backend package'
-                sh '''
-                    cd backend
+        // stage('Build Python Backend') {
+        //     steps {
+        //         echo 'Building Python backend package'
+        //         sh '''
+        //             cd backend
+        //             python3 -m venv venv
+        //             . venv/bin/activate
+        //             pip install --upgrade pip setuptools wheel
+        //             python setup.py sdist bdist_wheel
+        //             ls -l dist
+        //         '''
+        //     }
+        // }
 
-                    python3 -m venv venv
-                    . venv/bin/activate
+        // stage('Upload to Nexus') {
+        //     steps {
+        //         echo 'Uploading Python package to Nexus'
+        //         withCredentials([usernamePassword(
+        //             credentialsId: 'nexus-creds',
+        //             usernameVariable: 'NEXUS_USER',
+        //             passwordVariable: 'NEXUS_PASS'
+        //         )]) {
+        //             sh '''
+        //                 cd backend
+        //                 . venv/bin/activate
+        //                 pip install twine
 
-                    pip install --upgrade pip setuptools wheel
+        //                 cat > ~/.pypirc <<EOF
+        // [distutils]
+        // index-servers =
+        //     nexus
 
-                    python setup.py sdist bdist_wheel
+        // [nexus]
+        // repository: http://43.202.62.54:8081/repository/pypi-releases/
+        // username: $NEXUS_USER
+        // password: $NEXUS_PASS
+        // EOF
 
-                    ls -l dist
-                '''
-            }
-        }
+        //                 twine upload -r nexus dist/*
+        //             '''
+        //         }
+        //     }
+        // }
 
-        stage('Upload to Nexus') {
-            steps {
-                echo 'Uploading Python package to Nexus'
+        // stage('Build Docker Image') {
+        //     steps {
+        //         echo 'Building Docker image'
+        //         sh '''
+        //             cd backend
+        //             docker build -t $IMAGE_NAME .
+        //         '''
+        //     }
+        // }
 
-                withCredentials([usernamePassword(
-                    credentialsId: 'nexus-creds',
-                    usernameVariable: 'NEXUS_USER',
-                    passwordVariable: 'NEXUS_PASS'
-                )]) {
+        // stage('Push to Docker Hub') {
+        //     steps {
+        //         echo 'Pushing Docker image to Docker Hub'
+        //         withCredentials([usernamePassword(
+        //             credentialsId: 'dockerhub-creds',
+        //             usernameVariable: 'DOCKER_USER',
+        //             passwordVariable: 'DOCKER_PASS'
+        //         )]) {
+        //             sh '''
+        //                 echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-                    sh '''
-                        cd backend
-                        . venv/bin/activate
+        //                 docker push $IMAGE_NAME
 
-                        pip install twine
+        //                 docker tag $IMAGE_NAME shivavaddi/kubernetes-project:latest
+        //                 docker push shivavaddi/kubernetes-project:latest
 
-                        cat > ~/.pypirc <<EOF
-[distutils]
-index-servers =
-    nexus
-
-[nexus]
-repository: http://43.202.62.54:8081/repository/pypi-releases/
-username: $NEXUS_USER
-password: $NEXUS_PASS
-EOF
-
-                        twine upload -r nexus dist/*
-                    '''
-                }
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                echo 'Building Docker image'
-                sh '''
-                    cd backend
-                    docker build -t $IMAGE_NAME .
-                '''
-            }
-        }
-
-        stage('Push to Docker Hub') {
-            steps {
-                echo 'Pushing Docker image to Docker Hub'
-
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-
-                    sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-
-                        docker push $IMAGE_NAME
-
-                        docker tag $IMAGE_NAME shivavaddi/kubernetes-project:latest
-                        docker push shivavaddi/kubernetes-project:latest
-
-                        docker logout
-                    '''
-                }
-            }
-        }
-        */
+        //                 docker logout
+        //             '''
+        //         }
+        //     }
+        // }
     }
 
     post {
