@@ -1,3 +1,15 @@
+terraform {
+  required_version = ">= 1.3.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.40"
+    }
+  }
+}
+
+
 provider "aws" {
   region = "ap-northeast-2"
 }
@@ -42,6 +54,7 @@ module "eks" {
       max_size     = 2
 
       instance_types = ["t3.medium"]
+      ami_type = "AL2_x86_64"
       capacity_type  = "ON_DEMAND"
     }
   }
