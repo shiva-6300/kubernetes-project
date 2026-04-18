@@ -16,4 +16,4 @@ spec:
       - name: app
         image: shivavaddi/kubernetes-project:latest
         ports:
-        - containerPort: 8080
+        - containerPort: 5000
