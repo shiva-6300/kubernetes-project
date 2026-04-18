@@ -39,6 +39,11 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "20.8.5"
 
+  create_cloudwatch_log_group = false
+  cluster_endpoint_public_access  = true
+  cluster_endpoint_private_access = true
+
+
   cluster_name    = "shiva-cluster"
   cluster_version = "1.29"
 
