@@ -128,8 +128,8 @@ EOF
             steps {
                 echo 'Deploying to EKS cluster'
                 sh '''
-                    kubectl apply -f Kubernetes/deployment.yaml
-                    kubectl apply -f Kubernetes/service.yaml
+                    kubectl apply -f Kubernetes/deployment.yaml  --validate=false
+                    kubectl apply -f Kubernetes/service.yaml  --validate=false
                 '''
             }
         }
