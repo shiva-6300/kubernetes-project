@@ -4,7 +4,7 @@ pipeline {
     environment {
         SONARQUBE_SERVER = 'SonarQube'
         SCANNER_HOME = tool 'SonarScanner'
-        IMAGE_NAME = "shivavaddi/kubernetes-project:latest"
+        IMAGE_NAME = "shivavaddi/kubernetes-project:${BUILD_NUMBER}"
     }
 
     stages {
@@ -19,9 +19,7 @@ pipeline {
         stage('Trivy FS Scan') {
             steps {
                 echo 'Running filesystem security scan'
-                sh '''
-                    trivy fs --severity HIGH,CRITICAL .
-                '''
+                sh 'trivy fs --severity HIGH,CRITICAL .'
             }
         }
 
@@ -44,14 +42,10 @@ pipeline {
                 echo 'Building Python backend package'
                 sh '''
                     cd backend
-
                     python3 -m venv venv
                     . venv/bin/activate
-
                     pip install --upgrade pip setuptools wheel
-
                     python setup.py sdist bdist_wheel
-
                     ls -l dist
                 '''
             }
@@ -60,17 +54,14 @@ pipeline {
         stage('Upload to Nexus') {
             steps {
                 echo 'Uploading Python package to Nexus'
-
                 withCredentials([usernamePassword(
                     credentialsId: 'nexus-creds',
                     usernameVariable: 'NEXUS_USER',
                     passwordVariable: 'NEXUS_PASS'
                 )]) {
-
                     sh '''
                         cd backend
                         . venv/bin/activate
-
                         pip install twine
 
                         cat > ~/.pypirc <<EOF
@@ -103,28 +94,54 @@ EOF
         stage('Trivy Image Scan') {
             steps {
                 echo 'Scanning Docker image'
-                sh '''
-                    trivy image --severity HIGH,CRITICAL $IMAGE_NAME
-                '''
+                sh 'trivy image --severity HIGH,CRITICAL $IMAGE_NAME'
             }
         }
 
         stage('Push to DockerHub') {
             steps {
                 echo 'Pushing image to DockerHub'
-
                 withCredentials([usernamePassword(
                     credentialsId: 'docker-creds',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
-
                     sh '''
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
                         docker push $IMAGE_NAME
                         docker logout
                     '''
                 }
+            }
+        }
+
+        stage('Update K8s Manifest') {
+            steps {
+                echo 'Updating Kubernetes deployment image'
+                sh '''
+                    sed -i "s|image: .*|image: $IMAGE_NAME|g" k8s/deployment.yaml
+                '''
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                echo 'Deploying to EKS cluster'
+                sh '''
+                    kubectl apply -f Kubernetes/deployment.yaml
+                    kubectl apply -f Kubernetes/service.yaml
+                '''
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                echo 'Verifying deployment rollout'
+                sh '''
+                    kubectl rollout status deployment/kubernetes-project
+                    kubectl get pods -o wide
+                    kubectl get svc
+                '''
             }
         }
     }
