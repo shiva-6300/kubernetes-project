@@ -5,6 +5,7 @@ pipeline {
         SONARQUBE_SERVER = 'SonarQube'
         SCANNER_HOME = tool 'SonarScanner'
         IMAGE_NAME = "shivavaddi/kubernetes-project:${BUILD_NUMBER}"
+        AWS_DEFAULT_REGION = 'ap-northeast-2
     }
 
     stages {
