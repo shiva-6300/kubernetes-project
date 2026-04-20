@@ -12,21 +12,18 @@ pipeline {
 
         stage('Git Clone') {
             steps {
-                echo 'Checking out source code'
                 git url: 'https://github.com/shiva-6300/kubernetes-project.git', branch: 'main'
             }
         }
 
         stage('Trivy FS Scan') {
             steps {
-                echo 'Running filesystem security scan'
                 sh 'trivy fs --severity HIGH,CRITICAL .'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                echo 'Running SonarQube analysis'
                 withSonarQubeEnv("${SONARQUBE_SERVER}") {
                     sh """
                         ${SCANNER_HOME}/bin/sonar-scanner \
@@ -40,21 +37,18 @@ pipeline {
 
         stage('Build Python Backend') {
             steps {
-                echo 'Building Python backend package'
                 sh '''
                     cd backend
                     python3 -m venv venv
                     . venv/bin/activate
                     pip install --upgrade pip setuptools wheel
                     python setup.py sdist bdist_wheel
-                    ls -l dist
                 '''
             }
         }
 
         stage('Upload to Nexus') {
             steps {
-                echo 'Uploading Python package to Nexus'
                 withCredentials([usernamePassword(
                     credentialsId: 'nexus-creds',
                     usernameVariable: 'NEXUS_USER',
@@ -84,7 +78,6 @@ EOF
 
         stage('Build Docker Image') {
             steps {
-                echo 'Building Docker image'
                 sh '''
                     cd backend
                     docker build -t $IMAGE_NAME .
@@ -94,14 +87,12 @@ EOF
 
         stage('Trivy Image Scan') {
             steps {
-                echo 'Scanning Docker image'
                 sh 'trivy image --severity HIGH,CRITICAL $IMAGE_NAME'
             }
         }
 
         stage('Push to DockerHub') {
             steps {
-                echo 'Pushing image to DockerHub'
                 withCredentials([usernamePassword(
                     credentialsId: 'docker-creds',
                     usernameVariable: 'DOCKER_USER',
@@ -116,9 +107,28 @@ EOF
             }
         }
 
+        // 🔥 NEW STAGE (MOST IMPORTANT)
+        stage('Configure EKS Access') {
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-creds'
+                ]]) {
+                    sh '''
+                        echo "===== CONNECTING TO EKS ====="
+
+                        aws eks update-kubeconfig \
+                        --region ap-northeast-2 \
+                        --name shiva-cluster
+
+                        kubectl get nodes
+                    '''
+                }
+            }
+        }
+
         stage('Update K8s Manifest') {
             steps {
-                echo 'Updating Kubernetes deployment image'
                 sh '''
                     sed -i "s|image: .*|image: $IMAGE_NAME|g" Kubernetes/backend-deployment.yaml
                 '''
@@ -127,19 +137,17 @@ EOF
 
         stage('Deploy to Kubernetes') {
             steps {
-                echo 'Deploying to EKS cluster'
                 sh '''
-                    kubectl apply -f Kubernetes/backend-deployment.yaml  --validate=false
-                    kubectl apply -f Kubernetes/backend-service.yaml  --validate=false
+                    kubectl apply -f Kubernetes/backend-deployment.yaml --validate=false
+                    kubectl apply -f Kubernetes/backend-service.yaml --validate=false
                 '''
             }
         }
 
         stage('Verify Deployment') {
             steps {
-                echo 'Verifying deployment rollout'
                 sh '''
-                    kubectl rollout status deployment/kubernetes-project
+                    kubectl rollout status deployment/backend
                     kubectl get pods -o wide
                     kubectl get svc
                 '''
