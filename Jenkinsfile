@@ -120,7 +120,7 @@ EOF
             steps {
                 echo 'Updating Kubernetes deployment image'
                 sh '''
-                    sed -i "s|image: .*|image: $IMAGE_NAME|g" Kubernetes/deployment.yaml
+                    sed -i "s|image: .*|image: $IMAGE_NAME|g" Kubernetes/backend-deployment.yaml.yaml
                 '''
             }
         }
@@ -129,8 +129,8 @@ EOF
             steps {
                 echo 'Deploying to EKS cluster'
                 sh '''
-                    kubectl apply -f Kubernetes/deployment.yaml  --validate=false
-                    kubectl apply -f Kubernetes/service.yaml  --validate=false
+                    kubectl apply -f Kubernetes/backend-deployment.yaml  --validate=false
+                    kubectl apply -f Kubernetes/backend-service.yaml  --validate=false
                 '''
             }
         }
