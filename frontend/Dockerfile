@@ -1,27 +1,26 @@
-# Stage 1: Build React App
+# Stage 1: Build
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependency files first (better caching)
-COPY package*.json ./
+# Copy only required files
+COPY package.json package-lock.json ./
+RUN npm ci
 
-RUN npm install
+# Copy only source code
+COPY src/ ./src/
+COPY public/ ./public/
 
-# Copy full project (not just src)
-COPY . .
-
-# Build React app
 RUN npm run build
 
 
-# Stage 2: Serve using Nginx
+# Stage 2: Nginx
 FROM nginx:alpine
 
-# Copy build output to nginx
+# Copy only build output
 COPY --from=builder /app/build /usr/share/nginx/html
 
-# Copy custom nginx config (important for React routing)
+# Copy nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
