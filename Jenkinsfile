@@ -120,7 +120,7 @@ EOF
             steps {
                 echo 'Updating Kubernetes deployment image'
                 sh '''
-                    sed -i "s|image: .*|image: $IMAGE_NAME|g" Kubernetes/backend-deployment.yaml.yaml
+                    sed -i "s|image: .*|image: $IMAGE_NAME|g" Kubernetes/backend-deployment.yaml
                 '''
             }
         }
