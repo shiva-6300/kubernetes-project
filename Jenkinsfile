@@ -4,7 +4,10 @@ pipeline {
     environment {
         SONARQUBE_SERVER = 'SonarQube'
         SCANNER_HOME = tool 'SonarScanner'
-        IMAGE_NAME = "shivavaddi/kubernetes-project:${BUILD_NUMBER}"
+
+        BACKEND_IMAGE = "shivavaddi/kubernetes-project:${BUILD_NUMBER}"
+        FRONTEND_IMAGE = "shivavaddi/frontend:${BUILD_NUMBER}"
+
         AWS_DEFAULT_REGION = 'ap-northeast-2'
     }
 
@@ -12,49 +15,69 @@ pipeline {
 
         stage('Git Clone') {
             steps {
-                echo 'Checking out source code'
                 git url: 'https://github.com/shiva-6300/kubernetes-project.git', branch: 'main'
             }
         }
 
         stage('Trivy FS Scan') {
             steps {
-                echo 'Running filesystem security scan'
                 sh 'trivy fs --severity HIGH,CRITICAL .'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                echo 'Running SonarQube analysis'
                 withSonarQubeEnv("${SONARQUBE_SERVER}") {
                     sh """
                         ${SCANNER_HOME}/bin/sonar-scanner \
                         -Dsonar.projectKey=kubernetes-project \
                         -Dsonar.sources=. \
-                        -Dsonar.exclusions=**/venv/**,**/__pycache__/**,**/*.pyc
+                        -Dsonar.exclusions=**/venv/**,**/__pycache__/**,**/*.pyc,**/node_modules/**
                     """
                 }
             }
         }
 
-        stage('Build Python Backend') {
+        // ================= COMBINED BUILD =================
+        stage('Build Frontend & Backend') {
             steps {
-                echo 'Building Python backend package'
                 sh '''
+                    echo "===== FRONTEND BUILD ====="
+                    cd frontend
+                    npm install
+                    npm run build
+                    cd ..
+
+                    echo "===== BACKEND BUILD ====="
                     cd backend
                     python3 -m venv venv
                     . venv/bin/activate
                     pip install --upgrade pip setuptools wheel
                     python setup.py sdist bdist_wheel
-                    ls -l dist
+                    cd ..
                 '''
             }
         }
 
-        stage('Upload to Nexus') {
+        // ================= COMBINED DOCKER =================
+        stage('Build Docker Images') {
             steps {
-                echo 'Uploading Python package to Nexus'
+                sh '''
+                    echo "===== BUILD FRONTEND IMAGE ====="
+                    cd frontend
+                    docker build -t $FRONTEND_IMAGE .
+                    cd ..
+
+                    echo "===== BUILD BACKEND IMAGE ====="
+                    cd backend
+                    docker build -t $BACKEND_IMAGE .
+                    cd ..
+                '''
+            }
+        }
+
+        stage('Upload Backend to Nexus') {
+            steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'nexus-creds',
                     usernameVariable: 'NEXUS_USER',
@@ -82,26 +105,18 @@ EOF
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Trivy Image Scan') {
             steps {
-                echo 'Building Docker image'
                 sh '''
-                    cd backend
-                    docker build -t $IMAGE_NAME .
+                    trivy image --severity HIGH,CRITICAL $BACKEND_IMAGE
+                    trivy image --severity HIGH,CRITICAL $FRONTEND_IMAGE
                 '''
             }
         }
 
-        stage('Trivy Image Scan') {
+        // ================= COMBINED PUSH =================
+        stage('Push Images') {
             steps {
-                echo 'Scanning Docker image'
-                sh 'trivy image --severity HIGH,CRITICAL $IMAGE_NAME'
-            }
-        }
-
-        stage('Push to DockerHub') {
-            steps {
-                echo 'Pushing image to DockerHub'
                 withCredentials([usernamePassword(
                     credentialsId: 'docker-creds',
                     usernameVariable: 'DOCKER_USER',
@@ -109,37 +124,44 @@ EOF
                 )]) {
                     sh '''
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push $IMAGE_NAME
+
+                        docker push $BACKEND_IMAGE
+                        docker push $FRONTEND_IMAGE
+
                         docker logout
                     '''
                 }
             }
         }
 
-        stage('Update K8s Manifest') {
+        // ================= UPDATE YAML =================
+        stage('Update Kubernetes Manifests') {
             steps {
-                echo 'Updating Kubernetes deployment image'
                 sh '''
-                    sed -i "s|image: .*|image: $IMAGE_NAME|g" Kubernetes/deployment.yaml
+                    sed -i "s|BACKEND_IMAGE|$BACKEND_IMAGE|g" Kubernetes/backend-deployment.yaml
+                    sed -i "s|FRONTEND_IMAGE|$FRONTEND_IMAGE|g" Kubernetes/frontend-deployment.yaml
                 '''
             }
         }
 
+        // ================= DEPLOY =================
         stage('Deploy to Kubernetes') {
             steps {
-                echo 'Deploying to EKS cluster'
                 sh '''
-                    kubectl apply -f Kubernetes/deployment.yaml  --validate=false
-                    kubectl apply -f Kubernetes/service.yaml  --validate=false
+                    kubectl apply -f Kubernetes/backend-deployment.yaml
+                    kubectl apply -f Kubernetes/backend-service.yaml
+
+                    kubectl apply -f Kubernetes/frontend-deployment.yaml
+                    kubectl apply -f Kubernetes/frontend-service.yaml
                 '''
             }
         }
 
         stage('Verify Deployment') {
             steps {
-                echo 'Verifying deployment rollout'
                 sh '''
-                    kubectl rollout status deployment/kubernetes-project
+                    kubectl rollout status deployment/backend
+                    kubectl rollout status deployment/frontend
                     kubectl get pods -o wide
                     kubectl get svc
                 '''
