@@ -2,9 +2,6 @@ pipeline {
     agent any
 
     environment {
-        SONARQUBE_SERVER = 'SonarQube'
-        SCANNER_HOME = tool 'SonarScanner'
-
         IMAGE_NAME = "shivavaddi/kubernetes-project:${BUILD_NUMBER}"
         FRONTEND_IMAGE = "shivavaddi/frontend:${BUILD_NUMBER}"
     }
@@ -29,7 +26,7 @@ pipeline {
             }
         }
 
-        stage('Push Images') {
+        stage('Push Docker Images') {
             steps {
                 withCredentials([usernamePassword(
                     credentialsId: 'docker-creds',
@@ -76,33 +73,36 @@ pipeline {
                             kubectl rollout status deployment/frontend --timeout=180s
                         '''
                     } catch (Exception e) {
-                        echo "❌ Rollout failed! Debugging..."
+
+                        echo "❌ Rollout failed! Collecting debug info..."
 
                         sh '''
+                            echo "===== POD STATUS ====="
                             kubectl get pods -o wide
+
+                            echo "===== FRONTEND DETAILS ====="
                             kubectl describe deployment frontend
+
+                            echo "===== FRONTEND LOGS ====="
                             kubectl logs -l app=frontend --tail=50 || true
                         '''
 
-                        error("Deployment failed")
+                        error("Deployment failed ❌")
                     }
                 }
             }
         }
 
-        stage('Get LoadBalancer URL') {
+        stage('Get Application URLs') {
             steps {
-                echo 'Fetching External URL...'
-
                 sh '''
-                    echo "Waiting for External IP..."
-                    sleep 20
-
-                    kubectl get svc frontend-service
-
                     echo "====================================="
-                    echo "🌐 APPLICATION URL:"
+                    echo "🌐 FRONTEND URL:"
                     kubectl get svc frontend-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+                    echo ""
+
+                    echo "🔗 BACKEND URL:"
+                    kubectl get svc backend-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
                     echo ""
                     echo "====================================="
                 '''
