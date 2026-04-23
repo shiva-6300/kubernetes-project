@@ -72,7 +72,7 @@ index-servers =
     nexus
 
 [nexus]
-repository: http://13.125.186.196:8081/repository/pypi-releases/
+repository: http://54.180.244.53:8081/repository/pypi-releases/
 username: $NEXUS_USER
 password: $NEXUS_PASS
 EOF
