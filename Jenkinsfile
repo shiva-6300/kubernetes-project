@@ -4,8 +4,8 @@ pipeline {
     environment {
         SONARQUBE_SERVER = 'SonarQube'
         SCANNER_HOME = tool 'SonarScanner'
-        IMAGE_NAME = "shivavaddi/kubernetes-project:${BUILD_NUMBER}"
-        FRONTEND_IMAGE = "shivavaddi/frontend:${BUILD_NUMBER}"
+        IMAGE_NAME = "shivavaddi/kubernetes-project:latest"
+        FRONTEND_IMAGE = "shivavaddi/frontend:latest"
         AWS_DEFAULT_REGION = 'ap-northeast-2'
     }
 
@@ -83,7 +83,7 @@ EOF
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Build Backend Docker Image') {
             steps {
                 echo 'Building Backend Docker image'
                 sh '''
@@ -93,14 +93,13 @@ EOF
             }
         }
 
-        stage('Trivy Image Scan') {
+        stage('Trivy Backend Image Scan') {
             steps {
                 echo 'Scanning Backend Docker image'
                 sh 'trivy image --severity HIGH,CRITICAL $IMAGE_NAME'
             }
         }
 
-        // ✅ Frontend Added (no changes to existing flow)
         stage('Build Frontend Docker Image') {
             steps {
                 echo 'Building Frontend Docker image'
