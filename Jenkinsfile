@@ -143,11 +143,11 @@ EOF
                 echo 'Deploying to Kubernetes'
 
                 sh '''
-                    kubectl apply -f k8s/backend-deployment.yaml
-                    kubectl apply -f k8s/backend-service.yaml
+                    kubectl apply -f Kubernetes/backend-deployment.yaml
+                    kubectl apply -f Kubernetes/backend-service.yaml
 
-                    kubectl apply -f k8s/frontend-deployment.yaml
-                    kubectl apply -f k8s/frontend-service.yaml
+                    kubectl apply -f Kubernetes/frontend-deployment.yaml
+                    kubectl apply -f Kubernetes/frontend-service.yaml
 
                     kubectl get pods
                     kubectl get svc
