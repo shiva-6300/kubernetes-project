@@ -5,6 +5,7 @@ pipeline {
         SONARQUBE_SERVER = 'SonarQube'
         SCANNER_HOME = tool 'SonarScanner'
         IMAGE_NAME = "shivavaddi/kubernetes-project:${BUILD_NUMBER}"
+        FRONTEND_IMAGE = "shivavaddi/frontend:${BUILD_NUMBER}"
         AWS_DEFAULT_REGION = 'ap-northeast-2'
     }
 
@@ -84,7 +85,7 @@ EOF
 
         stage('Build Docker Image') {
             steps {
-                echo 'Building Docker image'
+                echo 'Building Backend Docker image'
                 sh '''
                     cd backend
                     docker build -t $IMAGE_NAME .
@@ -94,14 +95,32 @@ EOF
 
         stage('Trivy Image Scan') {
             steps {
-                echo 'Scanning Docker image'
+                echo 'Scanning Backend Docker image'
                 sh 'trivy image --severity HIGH,CRITICAL $IMAGE_NAME'
+            }
+        }
+
+        // ✅ Frontend Added (no changes to existing flow)
+        stage('Build Frontend Docker Image') {
+            steps {
+                echo 'Building Frontend Docker image'
+                sh '''
+                    cd frontend
+                    docker build -t $FRONTEND_IMAGE .
+                '''
+            }
+        }
+
+        stage('Trivy Frontend Scan') {
+            steps {
+                echo 'Scanning Frontend Docker image'
+                sh 'trivy image --severity HIGH,CRITICAL $FRONTEND_IMAGE'
             }
         }
 
         stage('Push to DockerHub') {
             steps {
-                echo 'Pushing image to DockerHub'
+                echo 'Pushing images to DockerHub'
                 withCredentials([usernamePassword(
                     credentialsId: 'docker-creds',
                     usernameVariable: 'DOCKER_USER',
@@ -109,7 +128,10 @@ EOF
                 )]) {
                     sh '''
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
                         docker push $IMAGE_NAME
+                        docker push $FRONTEND_IMAGE
+
                         docker logout
                     '''
                 }
