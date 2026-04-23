@@ -115,36 +115,6 @@ EOF
                 }
             }
         }
-
-        stage('Update K8s Manifest') {
-            steps {
-                echo 'Updating Kubernetes deployment image'
-                sh '''
-                    sed -i "s|image: .*|image: $IMAGE_NAME|g" Kubernetes/deployment.yaml
-                '''
-            }
-        }
-
-        stage('Deploy to Kubernetes') {
-            steps {
-                echo 'Deploying to EKS cluster'
-                sh '''
-                    kubectl apply -f Kubernetes/deployment.yaml  --validate=false
-                    kubectl apply -f Kubernetes/service.yaml  --validate=false
-                '''
-            }
-        }
-
-        stage('Verify Deployment') {
-            steps {
-                echo 'Verifying deployment rollout'
-                sh '''
-                    kubectl rollout status deployment/kubernetes-project
-                    kubectl get pods -o wide
-                    kubectl get svc
-                '''
-            }
-        }
     }
 
     post {
