@@ -4,8 +4,10 @@ pipeline {
     environment {
         SONARQUBE_SERVER = 'SonarQube'
         SCANNER_HOME = tool 'SonarScanner'
-        IMAGE_NAME = "shivavaddi/kubernetes-project:latest"
-        FRONTEND_IMAGE = "shivavaddi/frontend:latest"
+
+        IMAGE_NAME = "shivavaddi/kubernetes-project:${BUILD_NUMBER}"
+        FRONTEND_IMAGE = "shivavaddi/frontend:${BUILD_NUMBER}"
+
         AWS_DEFAULT_REGION = 'ap-northeast-2'
     }
 
@@ -13,14 +15,14 @@ pipeline {
 
         stage('Git Clone') {
             steps {
-                echo 'Checking out source code'
+                echo 'Cloning repository'
                 git url: 'https://github.com/shiva-6300/kubernetes-project.git', branch: 'main'
             }
         }
 
         stage('Trivy FS Scan') {
             steps {
-                echo 'Running filesystem security scan'
+                echo 'Scanning filesystem'
                 sh 'trivy fs --severity HIGH,CRITICAL .'
             }
         }
@@ -41,21 +43,20 @@ pipeline {
 
         stage('Build Python Backend') {
             steps {
-                echo 'Building Python backend package'
+                echo 'Building backend'
                 sh '''
                     cd backend
                     python3 -m venv venv
                     . venv/bin/activate
                     pip install --upgrade pip setuptools wheel
                     python setup.py sdist bdist_wheel
-                    ls -l dist
                 '''
             }
         }
 
         stage('Upload to Nexus') {
             steps {
-                echo 'Uploading Python package to Nexus'
+                echo 'Uploading package to Nexus'
                 withCredentials([usernamePassword(
                     credentialsId: 'nexus-creds',
                     usernameVariable: 'NEXUS_USER',
@@ -85,7 +86,7 @@ EOF
 
         stage('Build Backend Docker Image') {
             steps {
-                echo 'Building Backend Docker image'
+                echo 'Building backend image'
                 sh '''
                     cd backend
                     docker build -t $IMAGE_NAME .
@@ -95,14 +96,14 @@ EOF
 
         stage('Trivy Backend Image Scan') {
             steps {
-                echo 'Scanning Backend Docker image'
+                echo 'Scanning backend image'
                 sh 'trivy image --severity HIGH,CRITICAL $IMAGE_NAME'
             }
         }
 
         stage('Build Frontend Docker Image') {
             steps {
-                echo 'Building Frontend Docker image'
+                echo 'Building frontend image'
                 sh '''
                     cd frontend
                     docker build -t $FRONTEND_IMAGE .
@@ -112,7 +113,7 @@ EOF
 
         stage('Trivy Frontend Scan') {
             steps {
-                echo 'Scanning Frontend Docker image'
+                echo 'Scanning frontend image'
                 sh 'trivy image --severity HIGH,CRITICAL $FRONTEND_IMAGE'
             }
         }
@@ -134,6 +135,23 @@ EOF
                         docker logout
                     '''
                 }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                echo 'Deploying to Kubernetes'
+
+                sh '''
+                    kubectl apply -f k8s/backend-deployment.yaml
+                    kubectl apply -f k8s/backend-service.yaml
+
+                    kubectl apply -f k8s/frontend-deployment.yaml
+                    kubectl apply -f k8s/frontend-service.yaml
+
+                    kubectl get pods
+                    kubectl get svc
+                '''
             }
         }
     }
