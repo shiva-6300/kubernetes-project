@@ -22,14 +22,12 @@ pipeline {
 
         stage('Trivy FS Scan') {
             steps {
-                echo 'Scanning filesystem'
                 sh 'trivy fs --severity HIGH,CRITICAL .'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                echo 'Running SonarQube analysis'
                 withSonarQubeEnv("${SONARQUBE_SERVER}") {
                     sh """
                         ${SCANNER_HOME}/bin/sonar-scanner \
@@ -43,7 +41,6 @@ pipeline {
 
         stage('Build Python Backend') {
             steps {
-                echo 'Building backend'
                 sh '''
                     cd backend
                     python3 -m venv venv
@@ -56,7 +53,6 @@ pipeline {
 
         stage('Upload to Nexus') {
             steps {
-                echo 'Uploading package to Nexus'
                 withCredentials([usernamePassword(
                     credentialsId: 'nexus-creds',
                     usernameVariable: 'NEXUS_USER',
@@ -84,43 +80,29 @@ EOF
             }
         }
 
-        stage('Build Backend Docker Image') {
+        stage('Build Docker Images') {
             steps {
-                echo 'Building backend image'
                 sh '''
                     cd backend
                     docker build -t $IMAGE_NAME .
-                '''
-            }
-        }
 
-        stage('Trivy Backend Image Scan') {
-            steps {
-                echo 'Scanning backend image'
-                sh 'trivy image --severity HIGH,CRITICAL $IMAGE_NAME'
-            }
-        }
-
-        stage('Build Frontend Docker Image') {
-            steps {
-                echo 'Building frontend image'
-                sh '''
-                    cd frontend
+                    cd ../frontend
                     docker build -t $FRONTEND_IMAGE .
                 '''
             }
         }
 
-        stage('Trivy Frontend Scan') {
+        stage('Trivy Image Scan') {
             steps {
-                echo 'Scanning frontend image'
-                sh 'trivy image --severity HIGH,CRITICAL $FRONTEND_IMAGE'
+                sh '''
+                    trivy image --severity HIGH,CRITICAL $IMAGE_NAME
+                    trivy image --severity HIGH,CRITICAL $FRONTEND_IMAGE
+                '''
             }
         }
 
-        stage('Push to DockerHub') {
+        stage('Push Docker Images') {
             steps {
-                echo 'Pushing images to DockerHub'
                 withCredentials([usernamePassword(
                     credentialsId: 'docker-creds',
                     usernameVariable: 'DOCKER_USER',
@@ -140,15 +122,37 @@ EOF
 
         stage('Deploy to Kubernetes') {
             steps {
-                echo 'Deploying to Kubernetes'
-
                 sh '''
+                    sed -i "s|image:.*|image: $IMAGE_NAME|g" Kubernetes/backend-deployment.yaml
+                    sed -i "s|image:.*|image: $FRONTEND_IMAGE|g" Kubernetes/frontend-deployment.yaml
+
                     kubectl apply -f Kubernetes/backend-deployment.yaml
                     kubectl apply -f Kubernetes/backend-service.yaml
 
                     kubectl apply -f Kubernetes/frontend-deployment.yaml
                     kubectl apply -f Kubernetes/frontend-service.yaml
+                '''
+            }
+        }
 
+        // ✅ NEW STAGE (IMPORTANT)
+        stage('Verify Deployment Rollout') {
+            steps {
+                echo 'Checking rollout status...'
+
+                sh '''
+                    echo "Checking backend rollout..."
+                    kubectl rollout status deployment/backend --timeout=120s
+
+                    echo "Checking frontend rollout..."
+                    kubectl rollout status deployment/frontend --timeout=120s
+                '''
+            }
+        }
+
+        stage('Post Deployment Check') {
+            steps {
+                sh '''
                     kubectl get pods
                     kubectl get svc
                 '''
