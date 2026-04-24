@@ -2,120 +2,97 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "shivavaddi/kubernetes-project:${BUILD_NUMBER}"
-        FRONTEND_IMAGE = "shivavaddi/frontend:${BUILD_NUMBER}"
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub-creds')
+        BACKEND_IMAGE = "shivavaddi/cost-backend:${BUILD_NUMBER}"
+        FRONTEND_IMAGE = "shivavaddi/cost-frontend:${BUILD_NUMBER}"
+        AWS_REGION = "ap-northeast-2"
+        CLUSTER_NAME = "shiva-cluster"
     }
 
     stages {
 
-        stage('Clone Code') {
+        stage('Checkout Code') {
             steps {
-                git url: 'https://github.com/shiva-6300/kubernetes-project.git', branch: 'main'
+                echo "Cloning GitHub Repository"
+                git url: 'https://github.com/shiva-6300/cost-monitoring-app.git', branch: 'main'
             }
         }
 
-        stage('Build Docker Images') {
+        stage('Build Backend Image') {
             steps {
-                sh '''
-                    cd backend
-                    docker build -t $IMAGE_NAME .
-
-                    cd ../frontend
-                    docker build -t $FRONTEND_IMAGE .
-                '''
+                sh """
+                docker build -t $BACKEND_IMAGE ./backend
+                """
             }
         }
 
-        stage('Push Docker Images') {
+        stage('Build Frontend Image') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'docker-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
-                    sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                sh """
+                docker build -t $FRONTEND_IMAGE ./frontend
+                """
+            }
+        }
 
-                        docker push $IMAGE_NAME
-                        docker push $FRONTEND_IMAGE
+        stage('Docker Login') {
+            steps {
+                sh """
+                echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin
+                """
+            }
+        }
 
-                        docker logout
-                    '''
-                }
+        stage('Push Images') {
+            steps {
+                sh """
+                docker push $BACKEND_IMAGE
+                docker push $FRONTEND_IMAGE
+                """
+            }
+        }
+
+        stage('Configure Kubeconfig (EKS FIX)') {
+            steps {
+                sh """
+                aws eks update-kubeconfig \
+                    --region $AWS_REGION \
+                    --name $CLUSTER_NAME
+
+                kubectl get nodes
+                """
             }
         }
 
         stage('Deploy to Kubernetes') {
             steps {
-                sh '''
-                    # Update images dynamically
-                    sed -i "s|image:.*|image: $IMAGE_NAME|g" Kubernetes/backend-deployment.yaml
-                    sed -i "s|image:.*|image: $FRONTEND_IMAGE|g" Kubernetes/frontend-deployment.yaml
+                sh """
+                sed -i 's|image:.*|image: '"$BACKEND_IMAGE"'|g' Kubernetes/backend-deployment.yaml
+                sed -i 's|image:.*|image: '"$FRONTEND_IMAGE"'|g' Kubernetes/frontend-deployment.yaml
 
-                    # Apply manifests
-                    kubectl apply -f Kubernetes/backend-deployment.yaml --validate=false
-                    kubectl apply -f Kubernetes/backend-service.yaml --validate=false
-                    kubectl apply -f Kubernetes/frontend-deployment.yaml --validate=false
-                    kubectl apply -f Kubernetes/frontend-service.yaml --validate=false
-                '''
+                kubectl apply -f Kubernetes/backend-deployment.yaml
+                kubectl apply -f Kubernetes/frontend-deployment.yaml
+                """
             }
         }
 
-        stage('Verify Rollout') {
+        stage('Verify Deployment') {
             steps {
-                script {
-                    try {
-                        sh '''
-                            echo "Checking backend rollout..."
-                            kubectl rollout status deployment/backend --timeout=180s
-
-                            echo "Checking frontend rollout..."
-                            kubectl rollout status deployment/frontend --timeout=180s
-                        '''
-                    } catch (Exception e) {
-
-                        echo "❌ Rollout failed! Collecting debug info..."
-
-                        sh '''
-                            echo "===== POD STATUS ====="
-                            kubectl get pods -o wide
-
-                            echo "===== FRONTEND DETAILS ====="
-                            kubectl describe deployment frontend
-
-                            echo "===== FRONTEND LOGS ====="
-                            kubectl logs -l app=frontend --tail=50 || true
-                        '''
-
-                        error("Deployment failed ❌")
-                    }
-                }
-            }
-        }
-
-        stage('Get Application URLs') {
-            steps {
-                sh '''
-                    echo "====================================="
-                    echo "🌐 FRONTEND URL:"
-                    kubectl get svc frontend-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
-                    echo ""
-
-                    echo "🔗 BACKEND URL:"
-                    kubectl get svc backend-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
-                    echo ""
-                    echo "====================================="
-                '''
+                sh """
+                kubectl get pods
+                kubectl get svc
+                kubectl rollout status deployment/backend
+                kubectl rollout status deployment/frontend
+                """
             }
         }
     }
 
     post {
         success {
-            echo '✅ Pipeline completed successfully'
+            echo "🚀 Deployment Successful!"
         }
         failure {
-            echo '❌ Pipeline failed'
+            echo "❌ Deployment Failed!"
         }
     }
 }
