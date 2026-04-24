@@ -14,7 +14,7 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 echo "Cloning GitHub Repository"
-                git url: 'https://github.com/shiva-6300/cost-monitoring-app.git', branch: 'main'
+                git url: 'https://github.com/shiva-6300/kubernetes-project.git', branch: 'main'
             }
         }
 
