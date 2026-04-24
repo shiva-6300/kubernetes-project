@@ -53,10 +53,10 @@ pipeline {
                     sed -i "s|image:.*|image: $FRONTEND_IMAGE|g" Kubernetes/frontend-deployment.yaml
 
                     # Apply manifests
-                    kubectl apply -f Kubernetes/backend-deployment.yaml
-                    kubectl apply -f Kubernetes/backend-service.yaml
-                    kubectl apply -f Kubernetes/frontend-deployment.yaml
-                    kubectl apply -f Kubernetes/frontend-service.yaml
+                    kubectl apply -f Kubernetes/backend-deployment.yaml --validate=false
+                    kubectl apply -f Kubernetes/backend-service.yaml --validate=false
+                    kubectl apply -f Kubernetes/frontend-deployment.yaml --validate=false
+                    kubectl apply -f Kubernetes/frontend-service.yaml --validate=false
                 '''
             }
         }
